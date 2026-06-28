@@ -32,6 +32,7 @@ export default function Alerts() {
   const [alertData, setAlertData] = useState([])
   const [loading, setLoading] = useState(true)
   const [dispatched, setDispatched] = useState({})
+  const [smsStatus, setSmsStatus] = useState({})
   const [filter, setFilter] = useState('All')
 
   useEffect(() => {
@@ -48,6 +49,28 @@ export default function Alerts() {
 
   function handleDispatch(id) {
     setDispatched(prev => ({ ...prev, [id]: true }))
+  }
+
+  async function handleSMS(a) {
+    const phone = window.prompt(`Enter phone number for ${a.ward}, ${a.city} (10 digits, no +91):`)
+    if (!phone || phone.length < 10) return
+    setSmsStatus(prev => ({ ...prev, [a.id]: 'sending' }))
+    try {
+      const response = await axios.post('/api/send-sms', {
+        phones: [phone], ward: a.ward, city: a.city,
+        risk: a.riskScore, hindi: a.hindi, english: a.english,
+      })
+      if (response.data.status === 'ok') {
+        setSmsStatus(prev => ({ ...prev, [a.id]: 'sent' }))
+        window.alert(`✅ SMS sent successfully to ${phone}!`)
+      } else {
+        setSmsStatus(prev => ({ ...prev, [a.id]: 'failed' }))
+        window.alert('❌ SMS failed. Check API key.')
+      }
+    } catch (err) {
+      setSmsStatus(prev => ({ ...prev, [a.id]: 'failed' }))
+      window.alert('❌ SMS error: ' + err.message)
+    }
   }
 
   if (loading) return (
@@ -87,6 +110,7 @@ export default function Alerts() {
               { label:'Critical', value:alertData.filter(a=>a.priority==='Critical').length, color:'#ff4444' },
               { label:'High', value:alertData.filter(a=>a.priority==='High').length, color:'#f5a623' },
               { label:'Dispatched', value:Object.keys(dispatched).length, color:'#00e5c0' },
+              { label:'SMS Sent', value:Object.values(smsStatus).filter(s=>s==='sent').length, color:'#1a8fe3' },
             ].map((s,i) => (
               <div key={i} style={{ background:'rgba(255,255,255,0.03)', border:`1px solid ${s.color}22`, borderRadius:12, padding:'12px 20px', minWidth:100 }}>
                 <p style={{ color:'rgba(143,168,192,0.6)', fontSize:11, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:4 }}>{s.label}</p>
@@ -163,20 +187,32 @@ export default function Alerts() {
                     </div>
                   </div>
 
-                  {/* Dispatch button */}
-                  <button
-                    onClick={() => handleDispatch(a.id)}
-                    disabled={isDone}
-                    style={{
-                      background: isDone ? 'rgba(0,229,192,0.1)' : 'transparent',
-                      border:`1px solid ${isDone?'#00e5c044':color+'44'}`,
-                      color: isDone ? '#00e5c0' : color,
-                      padding:'10px 20px', borderRadius:10, fontSize:13, fontWeight:600,
-                      cursor: isDone ? 'default' : 'pointer', flexShrink:0,
-                      transition:'all 0.2s',
-                    }}>
-                    {isDone ? 'Sent ✓' : 'Dispatch →'}
-                  </button>
+                  <div style={{ display:'flex', flexDirection:'column', gap:8, flexShrink:0 }}>
+                    <button
+                      onClick={() => handleDispatch(a.id)}
+                      disabled={isDone}
+                      style={{
+                        background: isDone ? 'rgba(0,229,192,0.1)' : 'transparent',
+                        border:`1px solid ${isDone?'#00e5c044':color+'44'}`,
+                        color: isDone ? '#00e5c0' : color,
+                        padding:'10px 20px', borderRadius:10, fontSize:13, fontWeight:600,
+                        cursor: isDone ? 'default' : 'pointer', transition:'all 0.2s',
+                      }}>
+                      {isDone ? 'Dispatched ✓' : 'Dispatch →'}
+                    </button>
+                    <button
+                      onClick={() => handleSMS(a)}
+                      disabled={smsStatus[a.id]==='sending'||smsStatus[a.id]==='sent'}
+                      style={{
+                        background: smsStatus[a.id]==='sent'?'rgba(26,143,227,0.1)':smsStatus[a.id]==='sending'?'rgba(255,255,255,0.05)':'rgba(0,229,192,0.08)',
+                        border: smsStatus[a.id]==='sent'?'1px solid #1a8fe344':smsStatus[a.id]==='failed'?'1px solid #ff444444':'1px solid rgba(0,229,192,0.3)',
+                        color: smsStatus[a.id]==='sent'?'#1a8fe3':smsStatus[a.id]==='failed'?'#ff4444':'#00e5c0',
+                        padding:'10px 20px', borderRadius:10, fontSize:13, fontWeight:600,
+                        cursor: smsStatus[a.id]==='sent'||smsStatus[a.id]==='sending'?'default':'pointer', transition:'all 0.2s',
+                      }}>
+                      {smsStatus[a.id]==='sending'?'⏳ Sending...':smsStatus[a.id]==='sent'?'📱 SMS Sent ✓':smsStatus[a.id]==='failed'?'❌ Failed':'📱 SMS Alert'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )

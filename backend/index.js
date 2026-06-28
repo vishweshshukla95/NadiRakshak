@@ -1,6 +1,7 @@
 const express = require('express');
 const { startScraper, getCachedData } = require('./cpcb-scraper');
 const { initOpenAQ, getAirData } = require('./openaq');
+const { sendSMS, sendAlertToMunicipality } = require('./sms');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
@@ -178,6 +179,22 @@ app.get('/api/monsoon', async (req, res) => {
 app.get('/api/air-quality', async (req, res) => {
   const { data, lastFetched } = getAirData();
   res.json({ status:'ok', cities:Object.values(data), lastFetched, total:Object.keys(data).length });
+});
+
+
+// ── ROUTE 7: Send SMS Alert ───────────────────────────────────────
+app.post('/api/send-sms', async (req, res) => {
+  const { phones, ward, city, risk, hindi, english } = req.body;
+  if (!phones || !phones.length) {
+    return res.status(400).json({ status:'error', message:'No phone numbers provided' });
+  }
+  try {
+    const results = await sendAlertToMunicipality(ward, city, risk, hindi, english, phones);
+    const successful = results.filter(r => r.success).length;
+    res.json({ status:'ok', message:`SMS sent to ${successful}/${phones.length} numbers`, results });
+  } catch (err) {
+    res.status(500).json({ status:'error', message: err.message });
+  }
 });
 
 app.listen(PORT, () => {
