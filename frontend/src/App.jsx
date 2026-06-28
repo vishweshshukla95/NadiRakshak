@@ -3,6 +3,7 @@ import Dashboard from './pages/Dashboard'
 import Alerts from './pages/Alerts'
 import HotspotMap from './pages/HotspotMap'
 import Trends from './pages/Trends'
+import Chatbot from './pages/Chatbot'
 import { useEffect, useState, useRef } from 'react'
 import axios from 'axios'
 
@@ -92,6 +93,7 @@ function Navbar() {
     { to:'/', label:'Home' }, { to:'/dashboard', label:'Dashboard' },
     { to:'/alerts', label:'Alerts' }, { to:'/hotspots', label:'Hotspot Map' },
     { to:'/trends', label:'Trends' },
+    { to:'/chatbot', label:'Ask AI' },
     { to:'/about', label:'About' },
   ]
   return (
@@ -269,6 +271,7 @@ export default function App() {
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/hotspots" element={<HotspotMap />} />
         <Route path="/trends" element={<Trends />} />
+        <Route path="/chatbot" element={<Chatbot />} />
         <Route path="/about" element={<About />} />
       </Routes>
     </BrowserRouter>
