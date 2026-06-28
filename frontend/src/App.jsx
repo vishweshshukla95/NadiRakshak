@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-do
 import Dashboard from './pages/Dashboard'
 import Alerts from './pages/Alerts'
 import HotspotMap from './pages/HotspotMap'
+import Trends from './pages/Trends'
 import { useEffect, useState, useRef } from 'react'
 import axios from 'axios'
 
@@ -90,6 +91,7 @@ function Navbar() {
   const links = [
     { to:'/', label:'Home' }, { to:'/dashboard', label:'Dashboard' },
     { to:'/alerts', label:'Alerts' }, { to:'/hotspots', label:'Hotspot Map' },
+    { to:'/trends', label:'Trends' },
     { to:'/about', label:'About' },
   ]
   return (
@@ -266,6 +268,7 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/hotspots" element={<HotspotMap />} />
+        <Route path="/trends" element={<Trends />} />
         <Route path="/about" element={<About />} />
       </Routes>
     </BrowserRouter>

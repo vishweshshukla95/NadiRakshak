@@ -196,7 +196,41 @@ app.post('/api/send-sms', async (req, res) => {
     res.status(500).json({ status:'error', message: err.message });
   }
 });
+// ── ROUTE 8: Historical Trend Data ───────────────────────────────
+app.get('/api/historical', (req, res) => {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  const currentMonth = new Date().getMonth()
 
+  // Generate 12 months of realistic historical data per river
+  const rivers = {
+    'Ganga-Varanasi': { baseBOD:38, baseDO:3.5, baseColiform:85000 },
+    'Yamuna-Delhi': { baseBOD:62, baseDO:1.1, baseColiform:420000 },
+    'Ganga-Haridwar': { baseBOD:8, baseDO:7.5, baseColiform:3000 },
+    'Gomti-Lucknow': { baseBOD:24, baseDO:4.5, baseColiform:32000 },
+    'Sabarmati-Ahmedabad': { baseBOD:6, baseDO:6.5, baseColiform:1800 },
+  }
+
+  const historicalData = months.map((month, i) => {
+    const isMonsoon = i >= 5 && i <= 9
+    const monsoonFactor = isMonsoon ? 1.4 : 1.0
+    const trend = 1 - (i * 0.005) // slight improvement over year
+
+    const dataPoint = { month }
+    Object.entries(rivers).forEach(([name, base]) => {
+      const variation = 0.9 + Math.random() * 0.2
+      dataPoint[name + '_BOD'] = parseFloat((base.baseBOD * monsoonFactor * trend * variation).toFixed(1))
+      dataPoint[name + '_DO'] = parseFloat((base.baseDO * (isMonsoon ? 0.85 : 1.0) * variation).toFixed(1))
+    })
+    return dataPoint
+  })
+
+  res.json({
+    status: 'ok',
+    data: historicalData,
+    rivers: Object.keys(rivers),
+    lastUpdated: new Date().toISOString(),
+  })
+})
 app.listen(PORT, () => {
   console.log(`NadiRakshak backend running on port ${PORT}`);
   startScraper();
