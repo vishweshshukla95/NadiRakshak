@@ -1,3 +1,4 @@
+
 const express = require('express');
 const { startScraper, getCachedData } = require('./cpcb-scraper');
 const { initOpenAQ, getAirData } = require('./openaq');
@@ -10,7 +11,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // ── REAL CPCB RIVER DATA (scraped + structured) ──────────────────
 const getRiverData = () => getCachedData();
@@ -230,6 +232,79 @@ app.get('/api/historical', (req, res) => {
     rivers: Object.keys(rivers),
     lastUpdated: new Date().toISOString(),
   })
+})
+// ── IN-MEMORY REPORTS STORE ───────────────────────────────────────
+let citizenReports = []
+let reportIdCounter = 1
+
+// ── ROUTE 9: Submit Citizen Report ───────────────────────────────
+app.post('/api/reports', (req, res) => {
+  const { city, ward, river, description, phone, severity, lat, lon, photo } = req.body
+  const report = {
+    id: `RPT-${String(reportIdCounter++).padStart(4,'0')}`,
+    city, ward, river, description,
+    phone: phone || 'Anonymous',
+    severity: severity || 'Medium',
+    lat: lat || null,
+    lon: lon || null,
+    photo: photo || null,
+    status: 'Pending',
+    points: 10,
+    timestamp: new Date().toISOString(),
+    verified: false,
+  }
+  citizenReports.unshift(report)
+
+  // Boost monsoon risk for this ward
+  console.log(`📱 New citizen report from ${city} — ${ward} — ${severity} severity`)
+
+  res.json({
+    status: 'ok',
+    report,
+    message: `Report submitted! You earned 10 NadiPoints 🌊`,
+    totalReports: citizenReports.length,
+  })
+})
+
+// ── ROUTE 9b: Get Reports By Phone (My Impact) ────────────────────
+app.get('/api/reports/by-phone/:phone', (req, res) => {
+  const phone = req.params.phone
+  const myReports = citizenReports.filter(r => r.phone === phone)
+  const totalPoints = myReports.reduce((sum, r) => sum + (r.points || 0), 0)
+  res.json({
+    status: 'ok',
+    reports: myReports,
+    totalReports: myReports.length,
+    totalPoints,
+  })
+})
+
+// ── ROUTE 10: Get All Reports ─────────────────────────────────────
+app.get('/api/reports', (req, res) => {
+  const leaderboard = {}
+  citizenReports.forEach(r => {
+    const key = `${r.ward}-${r.city}`
+    if (!leaderboard[key]) leaderboard[key] = { ward:r.ward, city:r.city, river:r.river, reports:0, points:0 }
+    leaderboard[key].reports++
+    leaderboard[key].points += r.points
+  })
+  res.json({
+    status: 'ok',
+    reports: citizenReports,
+    total: citizenReports.length,
+    leaderboard: Object.values(leaderboard).sort((a,b) => b.reports - a.reports),
+    lastUpdated: new Date().toISOString(),
+  })
+})
+
+// ── ROUTE 11: Verify Report (municipality action) ─────────────────
+app.patch('/api/reports/:id/verify', (req, res) => {
+  const report = citizenReports.find(r => r.id === req.params.id)
+  if (!report) return res.status(404).json({ status:'error', message:'Report not found' })
+  report.verified = true
+  report.status = 'Verified'
+  report.points += 25
+  res.json({ status:'ok', report, message:'Report verified! +25 bonus NadiPoints awarded' })
 })
 app.listen(PORT, () => {
   console.log(`NadiRakshak backend running on port ${PORT}`);

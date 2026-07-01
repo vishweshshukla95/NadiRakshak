@@ -1,0 +1,376 @@
+import { useState, useRef } from 'react'
+import axios from 'axios'
+
+const CITIES = [
+  { city:'Varanasi', wards:['Ward 14','Ward 15','Ward 16','Ward 22'], river:'Ganga' },
+  { city:'Kanpur', wards:['Ward 7','Ward 8','Ward 9','Ward 12'], river:'Ganga' },
+  { city:'Allahabad', wards:['Ward 22','Ward 23','Ward 24'], river:'Ganga' },
+  { city:'Haridwar', wards:['Ward 3','Ward 4','Ward 5'], river:'Ganga' },
+  { city:'Delhi', wards:['Ward 9','Ward 10','Ward 11','Ward 15'], river:'Yamuna' },
+  { city:'Mathura', wards:['Ward 2','Ward 3','Ward 4'], river:'Yamuna' },
+  { city:'Lucknow', wards:['Ward 1','Ward 5','Ward 8','Ward 12'], river:'Gomti' },
+]
+
+const SEVERITY_OPTIONS = [
+  { value:'Low', label:'Low — Small amount of plastic', color:'#00e5c0', emoji:'🟢' },
+  { value:'Medium', label:'Medium — Significant accumulation', color:'#f5a623', emoji:'🟡' },
+  { value:'High', label:'High — Large dump / drain overflow', color:'#ff4444', emoji:'🔴' },
+]
+
+export default function Report() {
+  const [step, setStep] = useState(1)
+  const [photo, setPhoto] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(null)
+  const [selectedCity, setSelectedCity] = useState(null)
+  const [form, setForm] = useState({
+    city:'', ward:'', river:'', description:'', phone:'', severity:'Medium', lat:null, lon:null
+  })
+  const [submitting, setSubmitting] = useState(false)
+  const [result, setResult] = useState(null)
+  const [gpsLoading, setGpsLoading] = useState(false)
+  const [points, setPoints] = useState(0)
+  const fileRef = useRef()
+
+  function handlePhoto(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      setPhoto(ev.target.result)
+      setPhotoPreview(ev.target.result)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function handleCity(city) {
+    const c = CITIES.find(c => c.city === city)
+    setSelectedCity(c)
+    setForm(prev => ({ ...prev, city, river: c?.river || '', ward:'' }))
+  }
+
+  function getGPS() {
+    setGpsLoading(true)
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setForm(prev => ({ ...prev, lat: pos.coords.latitude.toFixed(4), lon: pos.coords.longitude.toFixed(4) }))
+        setGpsLoading(false)
+      },
+      err => {
+        alert('GPS not available. Please enter location manually.')
+        setGpsLoading(false)
+      }
+    )
+  }
+
+  async function handleSubmit() {
+    if (!form.city || !form.ward || !form.description) {
+      alert('Please fill city, ward and description!')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const response = await axios.post('/api/reports', { ...form, photo })
+      setResult(response.data)
+      setPoints(response.data.report.points)
+      setStep(4)
+    } catch (err) {
+      alert('Submission failed: ' + err.message)
+    }
+    setSubmitting(false)
+  }
+
+  const stepLabels = ['Photo', 'Location', 'Details', 'Done']
+
+  return (
+    <div style={{ background:'#040d1a', minHeight:'100vh', color:'white', paddingTop:64 }}>
+      <style>{`
+        @keyframes pulse { 0% { transform:translate(-50%,-50%) scale(1); opacity:0.6; } 100% { transform:translate(-50%,-50%) scale(3); opacity:0; } }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes celebrate { 0%,100% { transform:scale(1); } 50% { transform:scale(1.2); } }
+      `}</style>
+
+      {/* Header */}
+      <div style={{ position:'relative', padding:'40px 40px 40px', overflow:'hidden', borderBottom:'1px solid rgba(0,229,192,0.1)' }}>
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse at 30% 50%, rgba(0,229,192,0.06) 0%, transparent 60%)' }} />
+        <div style={{ position:'relative', maxWidth:640, margin:'0 auto' }}>
+          <h1 style={{ fontSize:'clamp(24px,3vw,40px)', fontWeight:800, letterSpacing:'-1px', marginBottom:4 }}>
+            📱 Report Plastic Pollution
+          </h1>
+          <p style={{ color:'rgba(143,168,192,0.8)', fontSize:15 }}>
+            Spotted plastic near a river? Report it and earn NadiPoints!
+          </p>
+
+          {/* Step indicator */}
+          {step < 4 && (
+            <div style={{ display:'flex', gap:8, marginTop:24, alignItems:'center' }}>
+              {stepLabels.slice(0,3).map((l,i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{
+                    width:32, height:32, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                    background: step > i+1 ? '#00e5c0' : step === i+1 ? 'rgba(0,229,192,0.2)' : 'rgba(255,255,255,0.05)',
+                    border: step === i+1 ? '2px solid #00e5c0' : step > i+1 ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                    color: step > i+1 ? '#040d1a' : step === i+1 ? '#00e5c0' : 'rgba(143,168,192,0.4)',
+                    fontSize: 13, fontWeight:700,
+                  }}>
+                    {step > i+1 ? '✓' : i+1}
+                  </div>
+                  <span style={{ color: step === i+1 ? '#00e5c0' : 'rgba(143,168,192,0.4)', fontSize:13, fontWeight: step===i+1?600:400 }}>{l}</span>
+                  {i < 2 && <div style={{ width:32, height:1, background:'rgba(255,255,255,0.1)' }} />}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ maxWidth:640, margin:'0 auto', padding:'40px' }}>
+
+        {/* STEP 1 — Photo */}
+        {step === 1 && (
+          <div style={{ animation:'fadeIn 0.4s ease' }}>
+            <h2 style={{ color:'white', fontWeight:700, fontSize:22, marginBottom:8 }}>📸 Upload a Photo</h2>
+            <p style={{ color:'rgba(143,168,192,0.7)', fontSize:15, marginBottom:24 }}>Take a photo of the plastic you spotted near the river</p>
+
+            <div
+              onClick={() => fileRef.current.click()}
+              style={{
+                border: photoPreview ? '2px solid rgba(0,229,192,0.4)' : '2px dashed rgba(0,229,192,0.3)',
+                borderRadius:20, padding:photoPreview?0:'60px 40px', textAlign:'center',
+                cursor:'pointer', background:'rgba(0,229,192,0.03)', transition:'all 0.2s',
+                overflow:'hidden', minHeight:240, display:'flex', alignItems:'center', justifyContent:'center',
+              }}
+              onMouseEnter={e => e.currentTarget.style.borderColor='rgba(0,229,192,0.6)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor=photoPreview?'rgba(0,229,192,0.4)':'rgba(0,229,192,0.3)'}
+            >
+              {photoPreview ? (
+                <img src={photoPreview} alt="preview" style={{ width:'100%', maxHeight:400, objectFit:'cover' }} />
+              ) : (
+                <div>
+                  <div style={{ fontSize:64, marginBottom:16 }}>📷</div>
+                  <p style={{ color:'#00e5c0', fontWeight:600, fontSize:16, marginBottom:8 }}>Click to upload photo</p>
+                  <p style={{ color:'rgba(143,168,192,0.5)', fontSize:13 }}>JPG, PNG up to 10MB</p>
+                </div>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display:'none' }} />
+
+            {photoPreview && (
+              <button onClick={() => { setPhoto(null); setPhotoPreview(null) }}
+                style={{ marginTop:12, background:'transparent', border:'1px solid rgba(255,68,68,0.3)', color:'#ff4444', padding:'6px 16px', borderRadius:8, fontSize:13, cursor:'pointer' }}>
+                ✕ Remove photo
+              </button>
+            )}
+
+            <div style={{ display:'flex', gap:12, marginTop:32 }}>
+              <button onClick={() => setStep(2)} style={{
+                flex:1, background:'linear-gradient(135deg,#00e5c0,#1a8fe3)', color:'#040d1a',
+                border:'none', borderRadius:12, padding:'14px', fontSize:15, fontWeight:700, cursor:'pointer',
+              }}>
+                {photoPreview ? 'Next — Add Location →' : 'Skip Photo & Continue →'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2 — Location */}
+        {step === 2 && (
+          <div style={{ animation:'fadeIn 0.4s ease' }}>
+            <h2 style={{ color:'white', fontWeight:700, fontSize:22, marginBottom:8 }}>📍 Where did you see it?</h2>
+            <p style={{ color:'rgba(143,168,192,0.7)', fontSize:15, marginBottom:24 }}>Select the city and ward near the river</p>
+
+            {/* GPS button */}
+            <button onClick={getGPS} disabled={gpsLoading} style={{
+              background:'rgba(26,143,227,0.1)', border:'1px solid rgba(26,143,227,0.3)',
+              color:'#1a8fe3', padding:'10px 20px', borderRadius:10, fontSize:14, fontWeight:600,
+              cursor:'pointer', marginBottom:24, display:'flex', alignItems:'center', gap:8,
+            }}>
+              {gpsLoading ? '⏳ Getting GPS...' : '🛰️ Auto-detect my location'}
+            </button>
+
+            {form.lat && (
+              <div style={{ background:'rgba(0,229,192,0.08)', border:'1px solid rgba(0,229,192,0.2)', borderRadius:10, padding:'10px 16px', marginBottom:16, fontSize:13, color:'#00e5c0' }}>
+                ✅ GPS detected: {form.lat}°N, {form.lon}°E
+              </div>
+            )}
+
+            {/* City select */}
+            <div style={{ marginBottom:16 }}>
+              <p style={{ color:'rgba(143,168,192,0.7)', fontSize:13, marginBottom:8 }}>City</p>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                {CITIES.map(c => (
+                  <button key={c.city} onClick={() => handleCity(c.city)} style={{
+                    background: form.city===c.city ? 'rgba(0,229,192,0.1)' : 'rgba(255,255,255,0.03)',
+                    border: form.city===c.city ? '1px solid rgba(0,229,192,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                    color: form.city===c.city ? '#00e5c0' : 'rgba(143,168,192,0.7)',
+                    padding:'8px 16px', borderRadius:100, fontSize:13, fontWeight:600, cursor:'pointer',
+                  }}>{c.city}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Ward select */}
+            {selectedCity && (
+              <div style={{ marginBottom:16 }}>
+                <p style={{ color:'rgba(143,168,192,0.7)', fontSize:13, marginBottom:8 }}>Ward</p>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                  {selectedCity.wards.map(w => (
+                    <button key={w} onClick={() => setForm(prev => ({ ...prev, ward:w }))} style={{
+                      background: form.ward===w ? 'rgba(0,229,192,0.1)' : 'rgba(255,255,255,0.03)',
+                      border: form.ward===w ? '1px solid rgba(0,229,192,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                      color: form.ward===w ? '#00e5c0' : 'rgba(143,168,192,0.7)',
+                      padding:'8px 16px', borderRadius:100, fontSize:13, fontWeight:600, cursor:'pointer',
+                    }}>{w}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {form.river && (
+              <div style={{ background:'rgba(26,143,227,0.08)', border:'1px solid rgba(26,143,227,0.2)', borderRadius:10, padding:'10px 16px', fontSize:13, color:'#1a8fe3', marginBottom:16 }}>
+                🌊 Nearby river: <strong>{form.river}</strong>
+              </div>
+            )}
+
+            <div style={{ display:'flex', gap:12, marginTop:24 }}>
+              <button onClick={() => setStep(1)} style={{ background:'transparent', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(143,168,192,0.7)', padding:'14px 24px', borderRadius:12, fontSize:15, cursor:'pointer' }}>← Back</button>
+              <button onClick={() => setStep(3)} disabled={!form.city || !form.ward} style={{
+                flex:1, background: form.city&&form.ward ? 'linear-gradient(135deg,#00e5c0,#1a8fe3)' : 'rgba(255,255,255,0.05)',
+                color: form.city&&form.ward ? '#040d1a' : 'rgba(143,168,192,0.3)',
+                border:'none', borderRadius:12, padding:'14px', fontSize:15, fontWeight:700,
+                cursor: form.city&&form.ward ? 'pointer' : 'default',
+              }}>Next — Add Details →</button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3 — Details */}
+        {step === 3 && (
+          <div style={{ animation:'fadeIn 0.4s ease' }}>
+            <h2 style={{ color:'white', fontWeight:700, fontSize:22, marginBottom:8 }}>📝 Tell us more</h2>
+            <p style={{ color:'rgba(143,168,192,0.7)', fontSize:15, marginBottom:24 }}>Describe what you saw and how serious it is</p>
+
+            {/* Severity */}
+            <div style={{ marginBottom:24 }}>
+              <p style={{ color:'rgba(143,168,192,0.7)', fontSize:13, marginBottom:12 }}>Severity Level</p>
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {SEVERITY_OPTIONS.map(s => (
+                  <button key={s.value} onClick={() => setForm(prev => ({ ...prev, severity:s.value }))} style={{
+                    background: form.severity===s.value ? `${s.color}12` : 'rgba(255,255,255,0.02)',
+                    border: form.severity===s.value ? `1px solid ${s.color}44` : '1px solid rgba(255,255,255,0.08)',
+                    color: form.severity===s.value ? s.color : 'rgba(143,168,192,0.7)',
+                    padding:'12px 16px', borderRadius:12, fontSize:14, fontWeight:600, cursor:'pointer',
+                    textAlign:'left', display:'flex', alignItems:'center', gap:10,
+                  }}>
+                    <span style={{ fontSize:18 }}>{s.emoji}</span> {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Description */}
+            <div style={{ marginBottom:16 }}>
+              <p style={{ color:'rgba(143,168,192,0.7)', fontSize:13, marginBottom:8 }}>Description *</p>
+              <textarea
+                value={form.description}
+                onChange={e => setForm(prev => ({ ...prev, description:e.target.value }))}
+                placeholder="Describe what you saw... (e.g. Nale ke paas bahut plastic tha, monsoon mein nadi mein jayega)"
+                rows={4}
+                style={{
+                  width:'100%', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(0,229,192,0.2)',
+                  borderRadius:12, padding:'14px', color:'white', fontSize:14, outline:'none',
+                  resize:'vertical', fontFamily:'inherit', boxSizing:'border-box',
+                }}
+              />
+            </div>
+
+            {/* Phone */}
+            <div style={{ marginBottom:24 }}>
+              <p style={{ color:'rgba(143,168,192,0.7)', fontSize:13, marginBottom:8 }}>Phone Number (optional)</p>
+              <input
+                value={form.phone}
+                onChange={e => setForm(prev => ({ ...prev, phone:e.target.value }))}
+                placeholder="10-digit mobile number"
+                style={{
+                  width:'100%', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)',
+                  borderRadius:12, padding:'14px', color:'white', fontSize:14, outline:'none',
+                  boxSizing:'border-box',
+                }}
+              />
+            </div>
+
+            {/* Summary */}
+            <div style={{ background:'rgba(0,229,192,0.05)', border:'1px solid rgba(0,229,192,0.15)', borderRadius:12, padding:'16px', marginBottom:24 }}>
+              <p style={{ color:'#00e5c0', fontWeight:600, fontSize:14, marginBottom:8 }}>📋 Report Summary</p>
+              <p style={{ color:'rgba(143,168,192,0.8)', fontSize:13 }}>📍 {form.ward}, {form.city} — {form.river} River</p>
+              <p style={{ color:'rgba(143,168,192,0.8)', fontSize:13 }}>⚡ Severity: {form.severity}</p>
+              {photo && <p style={{ color:'rgba(143,168,192,0.8)', fontSize:13 }}>📸 Photo attached</p>}
+              <p style={{ color:'#00e5c0', fontSize:13, marginTop:8, fontWeight:600 }}>🏆 You will earn +10 NadiPoints</p>
+            </div>
+
+            <div style={{ display:'flex', gap:12 }}>
+              <button onClick={() => setStep(2)} style={{ background:'transparent', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(143,168,192,0.7)', padding:'14px 24px', borderRadius:12, fontSize:15, cursor:'pointer' }}>← Back</button>
+              <button onClick={handleSubmit} disabled={submitting || !form.description} style={{
+                flex:1, background: form.description ? 'linear-gradient(135deg,#00e5c0,#1a8fe3)' : 'rgba(255,255,255,0.05)',
+                color: form.description ? '#040d1a' : 'rgba(143,168,192,0.3)',
+                border:'none', borderRadius:12, padding:'14px', fontSize:15, fontWeight:700,
+                cursor: form.description ? 'pointer' : 'default',
+              }}>
+                {submitting ? '⏳ Submitting...' : '🚀 Submit Report'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4 — Success */}
+        {step === 4 && result && (
+          <div style={{ animation:'fadeIn 0.4s ease', textAlign:'center' }}>
+            <div style={{ fontSize:80, marginBottom:24, animation:'celebrate 0.6s ease' }}>🎉</div>
+            <h2 style={{ color:'#00e5c0', fontWeight:800, fontSize:32, marginBottom:8 }}>Report Submitted!</h2>
+            <p style={{ color:'rgba(143,168,192,0.8)', fontSize:16, marginBottom:32 }}>
+              Thank you for protecting India's rivers. Your report has been sent to the municipality.
+            </p>
+
+            {/* Points card */}
+            <div style={{ background:'linear-gradient(135deg,rgba(0,229,192,0.1),rgba(26,143,227,0.1))', border:'1px solid rgba(0,229,192,0.3)', borderRadius:20, padding:'32px', marginBottom:32 }}>
+              <p style={{ color:'rgba(143,168,192,0.7)', fontSize:14, marginBottom:8 }}>You earned</p>
+              <p style={{ color:'#00e5c0', fontSize:64, fontWeight:800, lineHeight:1 }}>+{points}</p>
+              <p style={{ color:'#00e5c0', fontSize:20, fontWeight:600 }}>NadiPoints 🌊</p>
+              <div style={{ marginTop:16, background:'rgba(0,0,0,0.2)', borderRadius:12, padding:'12px' }}>
+                <p style={{ color:'rgba(143,168,192,0.6)', fontSize:12 }}>Report ID: <span style={{ color:'white', fontFamily:'monospace' }}>{result.report.id}</span></p>
+                <p style={{ color:'rgba(143,168,192,0.6)', fontSize:12, marginTop:4 }}>Status: <span style={{ color:'#f5a623' }}>Pending Verification</span></p>
+              </div>
+            </div>
+
+            {/* What happens next */}
+            <div style={{ background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:16, padding:'20px', marginBottom:32, textAlign:'left' }}>
+              <p style={{ color:'white', fontWeight:600, fontSize:15, marginBottom:12 }}>What happens next?</p>
+              {[
+                { icon:'📱', text:'Your report is sent to the municipality officer' },
+                { icon:'🔍', text:'Officer verifies the report (+25 bonus points for you!)' },
+                { icon:'🧹', text:'Cleanup crew is dispatched to your location' },
+                { icon:'📊', text:'Your report boosts the risk score on our Hotspot Map' },
+              ].map((s,i) => (
+                <div key={i} style={{ display:'flex', gap:12, marginBottom:10 }}>
+                  <span style={{ fontSize:18 }}>{s.icon}</span>
+                  <p style={{ color:'rgba(143,168,192,0.8)', fontSize:14 }}>{s.text}</p>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display:'flex', gap:12 }}>
+              <button onClick={() => { setStep(1); setForm({ city:'',ward:'',river:'',description:'',phone:'',severity:'Medium',lat:null,lon:null }); setPhoto(null); setPhotoPreview(null); setResult(null) }} style={{
+                flex:1, background:'rgba(0,229,192,0.1)', border:'1px solid rgba(0,229,192,0.3)',
+                color:'#00e5c0', padding:'14px', borderRadius:12, fontSize:15, fontWeight:600, cursor:'pointer',
+              }}>📱 Submit Another Report</button>
+              <a href="/hotspots" style={{
+                flex:1, background:'linear-gradient(135deg,#00e5c0,#1a8fe3)', color:'#040d1a',
+                padding:'14px', borderRadius:12, fontSize:15, fontWeight:700, textDecoration:'none',
+                display:'flex', alignItems:'center', justifyContent:'center',
+              }}>🗺️ View on Map →</a>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

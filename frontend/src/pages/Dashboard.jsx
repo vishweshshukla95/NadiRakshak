@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [healthIndex, setHealthIndex] = useState(0)
   const [monsoon, setMonsoon] = useState([])
   const [airQuality, setAirQuality] = useState([])
+  const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [countdown, setCountdown] = useState(300)
@@ -39,13 +40,15 @@ export default function Dashboard() {
       axios.get('/api/alerts'),
       axios.get('/api/monsoon'),
       axios.get('/api/air-quality'),
-    ]).then(([r1, r2, r3, r4, r5]) => {
+      axios.get('/api/reports'),
+    ]).then(([r1, r2, r3, r4, r5,r6]) => {
       setRiverData(r1.data.rivers)
       setHealthIndex(r1.data.healthIndex)
       setHotspots(r2.data.hotspots)
       setAlerts(r3.data.alerts)
       setMonsoon(r4.data.predictions)
       setAirQuality(r5.data.cities || [])
+      setReports(r6.data.reports || [])
       setLoading(false)
       setLastUpdated(new Date())
       setCountdown(300)
@@ -268,6 +271,41 @@ export default function Dashboard() {
             })}
           </div>
         </div>
+
+        <div style={{ background:'rgba(255,255,255,0.02)', border:'1px solid rgba(0,229,192,0.15)', borderRadius:20, padding:'28px', marginTop:24 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+            <h3 style={{ color:'white', fontWeight:700, fontSize:18 }}>📍 Recent Citizen Reports</h3>
+            <span style={{ background:'rgba(0,229,192,0.1)', color:'#00e5c0', fontSize:11, fontWeight:600, padding:'4px 12px', borderRadius:100 }}>Community</span>
+          </div>
+          <p style={{ color:'rgba(143,168,192,0.7)', fontSize:14, marginBottom:24 }}>Plastic pollution reports submitted by citizens</p>
+          {reports.length === 0 ? (
+            <p style={{ color:'rgba(143,168,192,0.5)', fontSize:14 }}>No reports yet. Be the first to report!</p>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              {reports.slice(0,5).map((r, i) => {
+                const color = r.severity==='High'?'#ff4444':r.severity==='Medium'?'#f5a623':'#00e5c0'
+                return (
+                  <div key={i} style={{ background:'rgba(255,255,255,0.02)', borderRadius:12, padding:'16px 20px', display:'flex', alignItems:'flex-start', gap:16 }}>
+                    <span style={{ width:10, height:10, borderRadius:'50%', background:color, flexShrink:0, marginTop:5 }} />
+                    <div style={{ flex:1 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                        <span style={{ color:'white', fontWeight:600, fontSize:14 }}>{r.ward} — {r.city}</span>
+                        <span style={{ background:`${color}18`, color, fontSize:11, fontWeight:600, padding:'2px 8px', borderRadius:100 }}>{r.severity}</span>
+                      </div>
+                      <p style={{ color:'rgba(143,168,192,0.7)', fontSize:13, marginBottom:4 }}>{r.description}</p>
+                      <div style={{ display:'flex', gap:16 }}>
+                        <span style={{ color:'rgba(143,168,192,0.5)', fontSize:12 }}>🌊 {r.river}</span>
+                        <span style={{ color:'rgba(143,168,192,0.5)', fontSize:12 }}>🏆 +{r.points} NadiPoints</span>
+                        <span style={{ color:'rgba(143,168,192,0.5)', fontSize:12 }}>🕐 {new Date(r.timestamp).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
 
       </div>
     </div>
